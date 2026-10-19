@@ -17,6 +17,9 @@ const statusEl = document.getElementById('status');
 const statusText = document.getElementById('status-text');
 const settings = document.getElementById('settings');
 const drop = document.getElementById('drop');
+const search = document.getElementById('search');
+const searchCount = document.getElementById('search-count');
+const noMatches = document.getElementById('no-matches');
 
 const player = new GifPlayer(previewCanvas);
 let selectedId = null;
@@ -55,8 +58,10 @@ function updateButtons() {
 function makeTile(gif) {
   const tile = document.createElement('button');
   tile.className = 'tile';
-  tile.title = gif.name;
+  const label = gif.name.replace(/[-_]+/g, ' ');
+  tile.title = label;
   tile.dataset.id = gif.id;
+  tile.dataset.search = label.toLowerCase();
   if (gif.id === selectedId) tile.classList.add('selected');
   const img = document.createElement('img');
   img.src = gif.url;
@@ -90,6 +95,21 @@ async function refreshGifs() {
   builtinHiddenText.textContent = `${hiddenBuiltinCount} hidden.`;
   mineGrid.replaceChildren(...mine.map(makeTile), addTile);
   if (selectedId && ![...builtin, ...mine].some((g) => g.id === selectedId)) clearSelection();
+  applySearch();
+}
+
+function applySearch() {
+  const words = search.value.toLowerCase().split(/[\s_-]+/).filter(Boolean);
+  const tiles = document.querySelectorAll('.tile[data-search]');
+  let shown = 0;
+  tiles.forEach((tile) => {
+    const match = words.every((w) => tile.dataset.search.includes(w));
+    tile.hidden = !match;
+    if (match) shown++;
+  });
+  searchCount.hidden = !words.length;
+  searchCount.textContent = `${shown} of ${tiles.length}`;
+  noMatches.hidden = !words.length || shown > 0;
 }
 
 function clearSelection() {
@@ -149,6 +169,20 @@ async function send() {
 }
 
 sendBtn.addEventListener('click', send);
+search.addEventListener('input', applySearch);
+search.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    search.value = '';
+    applySearch();
+  }
+});
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+    e.preventDefault();
+    search.focus();
+    search.select();
+  }
+});
 previewBtn.addEventListener('click', () => {
   if (!selectedId) return;
   api.preview({ gifId: selectedId, text: message.value.trim() });

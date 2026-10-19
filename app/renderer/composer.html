@@ -18,6 +18,12 @@
 
     <main>
       <section id="library" class="library">
+        <div class="search">
+          <input id="search" type="search" placeholder="Search GIFs… e.g. kiss, sleep, hug" autocomplete="off" />
+          <span id="search-count" class="search-count" hidden></span>
+        </div>
+        <p id="no-matches" class="empty" hidden>No GIFs match your search.</p>
+
         <h2>Our GIFs</h2>
         <div id="builtin" class="grid"></div>
         <p id="builtin-empty" class="empty" hidden>

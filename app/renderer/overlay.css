@@ -1,0 +1,120 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  user-select: none;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 0 8px 8px 0;
+  box-sizing: border-box;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 360px;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.card.hidden {
+  opacity: 0;
+  transform: translateY(24px) scale(0.96);
+}
+
+.bubble {
+  position: relative;
+  max-width: 320px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: #ffffff;
+  color: #3a2230;
+  border: 2px solid #ff8fb3;
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(80, 20, 50, 0.25);
+  text-align: center;
+}
+
+.bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-right: 2px solid #ff8fb3;
+  border-bottom: 2px solid #ff8fb3;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.bubble.empty {
+  display: none;
+}
+
+.from {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4527f;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.text {
+  font-size: 17px;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.gif-wrap {
+  position: relative;
+}
+
+canvas {
+  display: block;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.18));
+}
+
+.actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.card:hover .actions {
+  opacity: 1;
+}
+
+.actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #a3335c;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.actions button:hover {
+  background: #ffe3ec;
+}
+
+.actions button[hidden] {
+  display: none;
+}

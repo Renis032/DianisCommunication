@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: blob: file:; style-src 'self' 'unsafe-inline'"
+    />
+    <title>Dianis</title>
+    <link rel="stylesheet" href="composer.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Dianis <span class="heart">♥</span></h1>
+      <div id="status" class="status"><span class="dot"></span><span id="status-text">Connecting…</span></div>
+      <button id="open-settings" class="ghost" title="Settings">⚙ Settings</button>
+    </header>
+
+    <main>
+      <section id="library" class="library">
+        <h2>Our GIFs</h2>
+        <div id="builtin" class="grid"></div>
+        <p id="builtin-empty" class="empty" hidden>
+          No built-in GIFs yet. Put .gif files into the app's <code>gifs</code> folder.
+        </p>
+        <p id="builtin-hidden" class="empty" hidden>
+          <span id="builtin-hidden-text"></span>
+          <button id="restore-builtin" class="link">Restore</button>
+        </p>
+
+        <h2>My GIFs</h2>
+        <div id="mine" class="grid">
+          <button id="add-gif" class="tile add" title="Add GIFs from your computer">
+            <span>＋</span>Add GIFs
+          </button>
+        </div>
+        <p class="hint">Tip: you can also drag GIF files into this window.</p>
+      </section>
+
+      <aside class="compose">
+        <div class="preview checker">
+          <canvas id="preview"></canvas>
+          <p id="preview-empty">Pick a GIF</p>
+        </div>
+        <textarea id="message" maxlength="200" rows="3" placeholder="Write something sweet…"></textarea>
+        <div class="counter"><span id="count">0</span>/200</div>
+        <div class="buttons">
+          <button id="preview-btn" class="ghost" disabled title="Show it on your own screen first">Preview here</button>
+          <button id="send-btn" class="primary" disabled title="Ctrl+Enter">Send ♥</button>
+        </div>
+        <div id="toast" class="toast" hidden></div>
+      </aside>
+    </main>
+
+    <div id="drop" class="drop" hidden>Drop GIFs to add them</div>
+
+    <dialog id="settings">
+      <form method="dialog" id="settings-form">
+        <h2>Settings</h2>
+        <label>
+          Your name
+          <input id="cfg-name" required maxlength="40" placeholder="e.g. Dani" />
+        </label>
+        <label>
+          Server address
+          <input id="cfg-server" required placeholder="wss://your-relay.onrender.com" />
+        </label>
+        <label>
+          Room code <small>(same on both computers, keep it secret)</small>
+          <div class="row">
+            <input id="cfg-room" required minlength="6" placeholder="a long secret code" />
+            <button type="button" id="gen-room" class="ghost">Generate</button>
+          </div>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="cfg-autostart" />
+          Start with Windows
+        </label>
+        <div class="buttons">
+          <button type="button" id="cancel-settings" class="ghost">Cancel</button>
+          <button type="submit" class="primary">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="gifplayer.js"></script>
+    <script src="composer.js"></script>
+  </body>
+</html>

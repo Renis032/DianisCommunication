@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data: blob: file:; style-src 'self' 'unsafe-inline'"
+    />
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body>
+    <div id="card" class="card hidden">
+      <div class="bubble">
+        <div id="from" class="from"></div>
+        <div id="text" class="text"></div>
+      </div>
+      <div class="gif-wrap">
+        <canvas id="gif"></canvas>
+        <div class="actions">
+          <button id="reply" title="Reply">Reply</button>
+          <button id="save" title="Save this GIF to your collection">Save GIF</button>
+          <button id="close" title="Dismiss">✕</button>
+        </div>
+      </div>
+    </div>
+    <script src="gifplayer.js"></script>
+    <script src="overlay.js"></script>
+  </body>
+</html>

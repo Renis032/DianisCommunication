@@ -13,8 +13,14 @@
     <header>
       <h1>Dianis <span class="heart">♥</span></h1>
       <div id="status" class="status"><span class="dot"></span><span id="status-text">Connecting…</span></div>
+      <button id="open-history" class="ghost" title="The last 10 GIFs you received">🕘 History</button>
       <button id="open-settings" class="ghost" title="Settings">⚙ Settings</button>
     </header>
+
+    <div id="update-bar" class="update-bar" hidden>
+      <span id="update-text"></span>
+      <button id="update-restart" class="primary">Restart now</button>
+    </div>
 
     <main>
       <section id="library" class="library">
@@ -23,6 +29,14 @@
           <span id="search-count" class="search-count" hidden></span>
         </div>
         <p id="no-matches" class="empty" hidden>No GIFs match your search.</p>
+
+        <button id="add-gif" class="add-bar" title="Add GIFs from your computer (or drag files into this window)">
+          <span>＋</span> Add GIFs
+        </button>
+
+        <h2>★ Favourites</h2>
+        <div id="favs" class="grid"></div>
+        <p id="favs-empty" class="empty" hidden>Hover a GIF and click ☆ to keep it here.</p>
 
         <h2>Our GIFs</h2>
         <div id="builtin" class="grid"></div>
@@ -35,11 +49,8 @@
         </p>
 
         <h2>My GIFs</h2>
-        <div id="mine" class="grid">
-          <button id="add-gif" class="tile add" title="Add GIFs from your computer">
-            <span>＋</span>Add GIFs
-          </button>
-        </div>
+        <div id="mine" class="grid"></div>
+        <p id="mine-empty" class="empty" hidden>None yet. Use ＋ Add GIFs above.</p>
         <p class="hint">Tip: you can also drag GIF files into this window.</p>
       </section>
 
@@ -83,10 +94,21 @@
           Start with Windows
         </label>
         <div class="buttons">
+          <span id="app-version" class="version"></span>
           <button type="button" id="cancel-settings" class="ghost">Cancel</button>
           <button type="submit" class="primary">Save</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="history" class="history">
+      <div class="history-head">
+        <h2>History</h2>
+        <small>The last 10 GIFs you received. Click one to see it again.</small>
+        <button type="button" id="close-history" class="ghost">Close</button>
+      </div>
+      <ol id="history-list" class="history-list"></ol>
+      <p id="history-empty" class="empty" hidden>Nothing received yet.</p>
     </dialog>
 
     <script src="gifplayer.js"></script>

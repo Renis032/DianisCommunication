@@ -1,15 +1,17 @@
 {
   "name": "dianis",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Send each other GIFs with a message that pop up in the corner of the screen",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis",
-    "dist:portable": "electron-builder --win portable"
+    "dist": "electron-builder --win nsis --publish never",
+    "dist:portable": "electron-builder --win portable --publish never",
+    "release": "electron-builder --win nsis --publish always"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -31,10 +33,19 @@
         "to": "gifs"
       }
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Renis032",
+        "repo": "DianisCommunication",
+        "releaseType": "release"
+      }
+    ],
     "win": {
       "icon": "assets/icon.png"
     },
     "nsis": {
+      "artifactName": "Dianis-Setup-${version}.${ext}",
       "oneClick": true,
       "perMachine": false
     }

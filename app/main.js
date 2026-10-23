@@ -13,6 +13,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const WebSocket = require('ws');
+const { autoUpdater } = require('electron-updater');
 
 const GIF_TYPES = {
   '.gif': 'image/gif',
@@ -23,15 +24,28 @@ const GIF_TYPES = {
 const MAX_GIF_BYTES = 12 * 1024 * 1024;
 const OVERLAY_W = 380;
 const OVERLAY_H = 560;
+const HISTORY_LIMIT = 10;
+const UPDATE_CHECK_MS = 4 * 60 * 60 * 1000;
 
 const BUILTIN_DIR = app.isPackaged
   ? path.join(process.resourcesPath, 'gifs')
   : path.join(__dirname, 'gifs');
 const MY_DIR = () => path.join(app.getPath('userData'), 'my-gifs');
 const CONFIG_PATH = () => path.join(app.getPath('userData'), 'config.json');
+const HISTORY_DIR = () => path.join(app.getPath('userData'), 'history');
+const HISTORY_PATH = () => path.join(HISTORY_DIR(), 'history.json');
 const ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
 
-let config = { serverUrl: '', room: '', name: '', autostart: true, hiddenBuiltin: [] };
+let config = {
+  serverUrl: '',
+  room: '',
+  name: '',
+  autostart: true,
+  hiddenBuiltin: [],
+  favourites: [],
+};
+let history = [];
+let updateState = { ready: false, version: null };
 let composer = null;
 let overlay = null;
 let overlayReady = null;
@@ -51,6 +65,7 @@ function loadConfig() {
     config = { ...config, ...JSON.parse(fs.readFileSync(CONFIG_PATH(), 'utf8')) };
   } catch {}
   if (!Array.isArray(config.hiddenBuiltin)) config.hiddenBuiltin = [];
+  if (!Array.isArray(config.favourites)) config.favourites = [];
 }
 
 function saveConfig() {
@@ -124,6 +139,131 @@ function importGifs(paths) {
 
 function notifyGifsChanged() {
   if (composer && !composer.isDestroyed()) composer.webContents.send('gifs:changed');
+}
+
+function setFavourite(id, on) {
+  const list = config.favourites.filter((f) => f !== id);
+  if (on) list.unshift(id);
+  config.favourites = list;
+  saveConfig();
+  notifyGifsChanged();
+}
+
+function extFor(mime) {
+  return Object.keys(GIF_TYPES).find((k) => GIF_TYPES[k] === mime) || '.gif';
+}
+
+function loadHistory() {
+  try {
+    const list = JSON.parse(fs.readFileSync(HISTORY_PATH(), 'utf8'));
+    if (Array.isArray(list)) {
+      history = list.filter((h) => h && h.file && fs.existsSync(path.join(HISTORY_DIR(), h.file)));
+    }
+  } catch {}
+}
+
+function saveHistory() {
+  fs.mkdirSync(HISTORY_DIR(), { recursive: true });
+  fs.writeFileSync(HISTORY_PATH(), JSON.stringify(history, null, 2));
+}
+
+function notifyHistoryChanged() {
+  if (composer && !composer.isDestroyed()) composer.webContents.send('history:changed');
+}
+
+function addToHistory(item) {
+  if (history.some((h) => h.id === item.id)) return;
+  try {
+    fs.mkdirSync(HISTORY_DIR(), { recursive: true });
+    const file = `${crypto.randomUUID()}${extFor(item.mime)}`;
+    fs.writeFileSync(path.join(HISTORY_DIR(), file), item.bytes);
+    history.unshift({
+      id: item.id,
+      from: item.from,
+      text: item.text,
+      mime: item.mime,
+      gifName: item.gifName,
+      time: Date.now(),
+      file,
+    });
+    for (const old of history.splice(HISTORY_LIMIT)) {
+      try {
+        fs.unlinkSync(path.join(HISTORY_DIR(), old.file));
+      } catch {}
+    }
+    saveHistory();
+    notifyHistoryChanged();
+  } catch (err) {
+    console.error('Could not store history', err);
+  }
+}
+
+function getReceived(id) {
+  if (recentReceived.has(id)) return recentReceived.get(id);
+  const entry = history.find((h) => h.id === id);
+  if (!entry) return null;
+  try {
+    return { ...entry, bytes: fs.readFileSync(path.join(HISTORY_DIR(), entry.file)) };
+  } catch {
+    return null;
+  }
+}
+
+// Copies a received GIF into My GIFs (once per history entry) and returns its GIF id.
+function saveReceived(id) {
+  const entry = history.find((h) => h.id === id);
+  if (entry && entry.savedAs && fs.existsSync(path.join(MY_DIR(), entry.savedAs))) {
+    return `mine:${entry.savedAs}`;
+  }
+  const item = getReceived(id);
+  if (!item) return null;
+  fs.mkdirSync(MY_DIR(), { recursive: true });
+  const base = `${item.gifName || 'from ' + item.from}${extFor(item.mime)}`;
+  const file = path.basename(uniqueTarget(MY_DIR(), base));
+  fs.writeFileSync(path.join(MY_DIR(), file), item.bytes);
+  if (entry) {
+    entry.savedAs = file;
+    saveHistory();
+    notifyHistoryChanged();
+  }
+  notifyGifsChanged();
+  return `mine:${file}`;
+}
+
+function setupAutoUpdate() {
+  if (!app.isPackaged) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('error', (err) => console.error('Update failed:', err && err.message));
+  autoUpdater.on('update-downloaded', (info) => {
+    updateState = { ready: true, version: info.version };
+    if (composer && !composer.isDestroyed()) composer.webContents.send('update', updateState);
+    updateTray();
+    // The app lives in the tray and rarely quits, so install on its own once nobody is using it.
+    clearInterval(idleInstallTimer);
+    idleInstallTimer = setInterval(() => {
+      if (isIdle()) installUpdate(false);
+    }, 60 * 1000);
+  });
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  check();
+  setInterval(check, UPDATE_CHECK_MS);
+}
+
+let idleInstallTimer = null;
+
+function isIdle() {
+  const composerInUse =
+    composer && !composer.isDestroyed() && composer.isVisible() && !composer.isMinimized();
+  return !composerInUse && !overlayBusy && !overlayQueue.length && !pendingAcks.size;
+}
+
+function installUpdate(openAfter) {
+  if (!updateState.ready) return;
+  config.openAfterUpdate = !!openAfter;
+  saveConfig();
+  quitting = true;
+  autoUpdater.quitAndInstall(true, true);
 }
 
 let ws = null;
@@ -252,6 +392,7 @@ function receiveMessage(msg) {
   };
   recentReceived.set(item.id, item);
   while (recentReceived.size > 20) recentReceived.delete(recentReceived.keys().next().value);
+  addToHistory(item);
   enqueueOverlay(item);
 }
 
@@ -368,12 +509,16 @@ function updateTray() {
       ? `${status.peerName || 'Partner'} is online`
       : 'Connected, partner offline';
   tray.setToolTip(`Dianis - ${label}`);
+  const updateItems = updateState.ready
+    ? [{ label: `Restart to update (v${updateState.version})`, click: () => installUpdate(true) }]
+    : [];
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label, enabled: false },
       { type: 'separator' },
       { label: 'Send a GIF…', click: showComposer },
       { label: 'Reconnect', click: connect },
+      ...updateItems,
       { type: 'separator' },
       {
         label: 'Quit',
@@ -433,11 +578,11 @@ function applyAutostart() {
 ipcMain.handle('config:get', () => ({ ...config }));
 ipcMain.handle('config:set', (_e, next) => {
   config = {
+    ...config,
     serverUrl: String(next.serverUrl || '').trim(),
     room: String(next.room || '').trim(),
     name: String(next.name || '').trim(),
     autostart: !!next.autostart,
-    hiddenBuiltin: config.hiddenBuiltin,
   };
   saveConfig();
   applyAutostart();
@@ -449,11 +594,19 @@ ipcMain.handle('gifs:list', () => {
   const all = listDir(BUILTIN_DIR, 'builtin');
   const hidden = new Set(config.hiddenBuiltin);
   const builtin = all.filter((g) => !hidden.has(g.id));
+  const mine = listDir(MY_DIR(), 'mine');
+  const byId = new Map([...builtin, ...mine].map((g) => [g.id, g]));
   return {
+    favourites: config.favourites.map((id) => byId.get(id)).filter(Boolean),
     builtin,
     hiddenBuiltinCount: all.length - builtin.length,
-    mine: listDir(MY_DIR(), 'mine'),
+    mine,
   };
+});
+ipcMain.handle('gifs:favourite', (_e, id, on) => {
+  resolveGif(id);
+  setFavourite(id, !!on);
+  return true;
 });
 ipcMain.handle('gifs:read', (_e, id) => {
   const gif = resolveGif(id);
@@ -477,6 +630,8 @@ ipcMain.handle('gifs:delete', (_e, id) => {
   } else {
     fs.unlinkSync(gif.full);
   }
+  config.favourites = config.favourites.filter((f) => f !== id);
+  saveConfig();
   notifyGifsChanged();
   return true;
 });
@@ -513,16 +668,37 @@ ipcMain.on('overlay:done', () => {
   }
 });
 ipcMain.on('overlay:reply', () => showComposer());
-ipcMain.handle('overlay:save', (_e, id) => {
-  const item = recentReceived.get(id);
+ipcMain.handle('overlay:save', (_e, id) => !!saveReceived(id));
+
+ipcMain.handle('history:list', () =>
+  history.map((h) => ({
+    id: h.id,
+    from: h.from,
+    text: h.text,
+    time: h.time,
+    gifName: h.gifName,
+    saved: !!(h.savedAs && fs.existsSync(path.join(MY_DIR(), h.savedAs))),
+    favourite: !!h.savedAs && config.favourites.includes(`mine:${h.savedAs}`),
+    url: pathToFileURL(path.join(HISTORY_DIR(), h.file)).href,
+  }))
+);
+ipcMain.handle('history:replay', (_e, id) => {
+  const item = getReceived(id);
   if (!item) return false;
-  fs.mkdirSync(MY_DIR(), { recursive: true });
-  const ext = Object.keys(GIF_TYPES).find((k) => GIF_TYPES[k] === item.mime) || '.gif';
-  const base = `${item.gifName || 'from ' + item.from}${ext}`;
-  fs.writeFileSync(uniqueTarget(MY_DIR(), base), item.bytes);
-  notifyGifsChanged();
+  enqueueOverlay(item);
   return true;
 });
+ipcMain.handle('history:save', (_e, id) => !!saveReceived(id));
+ipcMain.handle('history:favourite', (_e, id) => {
+  const gifId = saveReceived(id);
+  if (!gifId) return false;
+  setFavourite(gifId, true);
+  notifyHistoryChanged();
+  return true;
+});
+
+ipcMain.handle('update:get', () => ({ ...updateState, current: app.getVersion() }));
+ipcMain.on('update:install', () => installUpdate(true));
 
 app.on('window-all-closed', (e) => e.preventDefault());
 app.on('before-quit', () => {
@@ -532,10 +708,19 @@ app.on('before-quit', () => {
 app.whenReady().then(() => {
   app.setAppUserModelId('com.dianis.communication');
   loadConfig();
+  loadHistory();
   applyAutostart();
   createOverlay();
   createTray();
   connect();
-  const startHidden = process.argv.includes('--hidden') && isConfigured();
+  // After an update the installer restarts us with --updated: stay in the tray unless the
+  // user asked for the restart themselves.
+  const afterQuietUpdate = process.argv.includes('--updated') && !config.openAfterUpdate;
+  if (config.openAfterUpdate) {
+    config.openAfterUpdate = false;
+    saveConfig();
+  }
+  const startHidden = (process.argv.includes('--hidden') || afterQuietUpdate) && isConfigured();
   if (!startHidden) showComposer();
+  setupAutoUpdate();
 });

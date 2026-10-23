@@ -22,7 +22,18 @@ contextBridge.exposeInMainWorld('dianis', {
     ),
   deleteGif: (id) => ipcRenderer.invoke('gifs:delete', id),
   restoreBuiltin: () => ipcRenderer.invoke('gifs:restoreBuiltin'),
+  setFavourite: (id, on) => ipcRenderer.invoke('gifs:favourite', id, on),
   onGifsChanged: (cb) => subscribe('gifs:changed', cb),
+
+  listHistory: () => ipcRenderer.invoke('history:list'),
+  replayHistory: (id) => ipcRenderer.invoke('history:replay', id),
+  saveHistory: (id) => ipcRenderer.invoke('history:save', id),
+  favouriteHistory: (id) => ipcRenderer.invoke('history:favourite', id),
+  onHistoryChanged: (cb) => subscribe('history:changed', cb),
+
+  getUpdate: () => ipcRenderer.invoke('update:get'),
+  onUpdate: (cb) => subscribe('update', cb),
+  installUpdate: () => ipcRenderer.send('update:install'),
 
   send: (payload) => ipcRenderer.invoke('message:send', payload),
   preview: (payload) => ipcRenderer.invoke('message:preview', payload),

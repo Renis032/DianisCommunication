@@ -1,7 +1,10 @@
 const api = window.dianis;
 
+const favsGrid = document.getElementById('favs');
+const favsEmpty = document.getElementById('favs-empty');
 const builtinGrid = document.getElementById('builtin');
 const mineGrid = document.getElementById('mine');
+const mineEmpty = document.getElementById('mine-empty');
 const addTile = document.getElementById('add-gif');
 const builtinEmpty = document.getElementById('builtin-empty');
 const builtinHidden = document.getElementById('builtin-hidden');
@@ -27,6 +30,7 @@ let selectedBytes = null;
 let status = { connected: false };
 let toastTimer = null;
 let sending = false;
+let favIds = new Set();
 
 function showToast(text, isError = false) {
   toast.textContent = text;
@@ -55,7 +59,7 @@ function updateButtons() {
   sendBtn.disabled = !selectedId || !status.connected || sending;
 }
 
-function makeTile(gif) {
+function makeTile(gif, inFavs = false) {
   const tile = document.createElement('button');
   tile.className = 'tile';
   const label = gif.name.replace(/[-_]+/g, ' ');
@@ -68,6 +72,18 @@ function makeTile(gif) {
   img.alt = gif.name;
   img.loading = 'lazy';
   tile.appendChild(img);
+  const isFav = favIds.has(gif.id);
+  const fav = document.createElement('span');
+  fav.className = isFav ? 'fav on' : 'fav';
+  fav.textContent = isFav ? '★' : '☆';
+  fav.title = isFav ? 'Remove from favourites' : 'Add to favourites';
+  fav.addEventListener('click', (e) => {
+    e.stopPropagation();
+    api.setFavourite(gif.id, !isFav);
+  });
+  tile.appendChild(fav);
+  tile.addEventListener('click', () => select(gif.id));
+  if (inFavs) return tile;
   const builtin = gif.source === 'builtin';
   const del = document.createElement('span');
   del.className = 'del';
@@ -83,17 +99,20 @@ function makeTile(gif) {
     if (selectedId === gif.id) clearSelection();
   });
   tile.appendChild(del);
-  tile.addEventListener('click', () => select(gif.id));
   return tile;
 }
 
 async function refreshGifs() {
-  const { builtin, hiddenBuiltinCount, mine } = await api.listGifs();
-  builtinGrid.replaceChildren(...builtin.map(makeTile));
+  const { favourites, builtin, hiddenBuiltinCount, mine } = await api.listGifs();
+  favIds = new Set(favourites.map((g) => g.id));
+  favsGrid.replaceChildren(...favourites.map((g) => makeTile(g, true)));
+  favsEmpty.hidden = favourites.length > 0;
+  builtinGrid.replaceChildren(...builtin.map((g) => makeTile(g)));
   builtinEmpty.hidden = builtin.length > 0 || hiddenBuiltinCount > 0;
   builtinHidden.hidden = !hiddenBuiltinCount;
   builtinHiddenText.textContent = `${hiddenBuiltinCount} hidden.`;
-  mineGrid.replaceChildren(...mine.map(makeTile), addTile);
+  mineGrid.replaceChildren(...mine.map((g) => makeTile(g)));
+  mineEmpty.hidden = mine.length > 0;
   if (selectedId && ![...builtin, ...mine].some((g) => g.id === selectedId)) clearSelection();
   applySearch();
 }
@@ -102,13 +121,17 @@ function applySearch() {
   const words = search.value.toLowerCase().split(/[\s_-]+/).filter(Boolean);
   const tiles = document.querySelectorAll('.tile[data-search]');
   let shown = 0;
+  let total = 0;
   tiles.forEach((tile) => {
     const match = words.every((w) => tile.dataset.search.includes(w));
     tile.hidden = !match;
+    // Favourites repeat GIFs from the sections below, so don't count them twice.
+    if (tile.parentElement === favsGrid) return;
+    total++;
     if (match) shown++;
   });
   searchCount.hidden = !words.length;
-  searchCount.textContent = `${shown} of ${tiles.length}`;
+  searchCount.textContent = `${shown} of ${total}`;
   noMatches.hidden = !words.length || shown > 0;
 }
 
@@ -135,8 +158,9 @@ async function renderPreview() {
 async function select(id) {
   selectedId = id;
   document.querySelectorAll('.tile.selected').forEach((t) => t.classList.remove('selected'));
-  const tile = document.querySelector(`.tile[data-id="${CSS.escape(id)}"]`);
-  if (tile) tile.classList.add('selected');
+  document
+    .querySelectorAll(`.tile[data-id="${CSS.escape(id)}"]`)
+    .forEach((t) => t.classList.add('selected'));
   updateButtons();
   selectedBytes = await api.readGif(id);
   if (selectedId !== id) return;
@@ -252,11 +276,111 @@ document.getElementById('settings-form').addEventListener('submit', async () => 
   });
 });
 
+const historyDialog = document.getElementById('history');
+const historyList = document.getElementById('history-list');
+const historyEmpty = document.getElementById('history-empty');
+
+function formatTime(ms) {
+  const d = new Date(ms);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return sameDay
+    ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function makeHistoryRow(h) {
+  const row = document.createElement('li');
+  row.className = 'history-row';
+  row.title = 'Show it again';
+  row.addEventListener('click', () => api.replayHistory(h.id));
+
+  const thumb = document.createElement('div');
+  thumb.className = 'history-thumb checker';
+  const img = document.createElement('img');
+  img.src = h.url;
+  img.alt = h.gifName || 'GIF';
+  thumb.appendChild(img);
+
+  const body = document.createElement('div');
+  body.className = 'history-body';
+  const meta = document.createElement('div');
+  meta.className = 'history-meta';
+  const from = document.createElement('strong');
+  from.textContent = h.from || 'Unknown';
+  const time = document.createElement('span');
+  time.textContent = formatTime(h.time);
+  meta.append(from, time);
+  const text = document.createElement('p');
+  text.className = h.text ? 'history-text' : 'history-text none';
+  text.textContent = h.text || '(no message)';
+  body.append(meta, text);
+
+  const actions = document.createElement('div');
+  actions.className = 'history-actions';
+  const save = document.createElement('button');
+  save.className = 'ghost small';
+  save.textContent = h.saved ? 'Saved ✓' : 'Save GIF';
+  save.disabled = h.saved;
+  save.title = 'Copy it into My GIFs';
+  save.addEventListener('click', (e) => {
+    e.stopPropagation();
+    api.saveHistory(h.id);
+  });
+  const fav = document.createElement('button');
+  fav.className = h.favourite ? 'ghost small fav-btn on' : 'ghost small fav-btn';
+  fav.textContent = h.favourite ? '★' : '☆';
+  fav.disabled = h.favourite;
+  fav.title = h.favourite ? 'In your favourites' : 'Save it and add to favourites';
+  fav.addEventListener('click', (e) => {
+    e.stopPropagation();
+    api.favouriteHistory(h.id);
+  });
+  actions.append(save, fav);
+
+  row.append(thumb, body, actions);
+  return row;
+}
+
+async function renderHistory() {
+  const items = await api.listHistory();
+  historyList.replaceChildren(...items.map(makeHistoryRow));
+  historyEmpty.hidden = items.length > 0;
+}
+
+document.getElementById('open-history').addEventListener('click', async () => {
+  await renderHistory();
+  historyDialog.showModal();
+});
+document.getElementById('close-history').addEventListener('click', () => historyDialog.close());
+historyDialog.addEventListener('click', (e) => {
+  if (e.target !== historyDialog) return;
+  const r = historyDialog.getBoundingClientRect();
+  const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  if (outside) historyDialog.close();
+});
+
+const updateBar = document.getElementById('update-bar');
+const updateText = document.getElementById('update-text');
+
+function renderUpdate(u) {
+  updateBar.hidden = !u.ready;
+  updateText.textContent = `Version ${u.version} is ready. It installs by itself while Dianis sits in the tray, or right now:`;
+}
+
+document.getElementById('update-restart').addEventListener('click', () => api.installUpdate());
+
 api.onStatus(renderStatus);
 api.onGifsChanged(refreshGifs);
+api.onHistoryChanged(() => {
+  if (historyDialog.open) renderHistory();
+});
+api.onUpdate(renderUpdate);
 
 (async () => {
   renderStatus(await api.getStatus());
+  const update = await api.getUpdate();
+  renderUpdate(update);
+  document.getElementById('app-version').textContent = `v${update.current}`;
   await refreshGifs();
   const cfg = await api.getConfig();
   if (!cfg.name || !cfg.serverUrl || !cfg.room) openSettings();

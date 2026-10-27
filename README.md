@@ -8,6 +8,20 @@ server/   tiny WebSocket relay (deploy once, both apps connect to it)
 app/      Windows desktop app (Electron): tray icon, compose window, corner overlay
 ```
 
+## Screenshots
+
+| A message arrives in the corner | Hover it to reply or keep the GIF |
+|---|---|
+| <img src="docs/screenshots/overlay.gif" alt="A GIF pops up in the bottom-right corner with the message in a speech bubble, then fades away" width="400"> | <img src="docs/screenshots/overlay-hover.png" alt="Hovering the overlay shows Reply, Save GIF and ✕" width="400"> |
+| The GIF plays above the taskbar with the sender's name and message in a speech bubble, then fades out. | Hovering pauses it and shows **Reply**, **Save GIF** and **✕**. |
+
+| Pick a GIF and write a message | Settings |
+|---|---|
+| <img src="docs/screenshots/composer.png" alt="Compose window: GIF library with search, favourites and Our GIFs on the left, preview, message box and Send on the right" width="400"> | <img src="docs/screenshots/settings.png" alt="Settings dialog with name, server address, room code and Start with Windows" width="400"> |
+| Search, favourites, the built-in and your own GIFs on the left; preview, message and **Send ♥** on the right. The dot shows whether the other person is online. | Your name, the relay address and the shared room code. |
+
+A still version of the corner overlay: [`docs/screenshots/overlay.png`](docs/screenshots/overlay.png).
+
 ## How it works
 
 - Both apps connect to the relay with the **same room code** (a shared secret) and their own name.

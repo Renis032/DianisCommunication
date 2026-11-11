@@ -3,6 +3,9 @@
 Send each other GIFs with a little message. Received GIFs pop up in the bottom-right corner of the
 screen with the text in a speech bubble above them, then fade away.
 
+**Download for Windows:** [latest installer](https://github.com/Renis032/DianisCommunication/releases/latest)
+(both of you also need the relay, see [Deploy the relay](#1-deploy-the-relay-once)).
+
 ```
 server/   tiny WebSocket relay (deploy once, both apps connect to it)
 app/      Windows desktop app (Electron): tray icon, compose window, corner overlay
@@ -52,7 +55,9 @@ or restarts**. For always-on delivery, use a paid instance or any small VPS:
 
 ## 2. Install the app
 
-The installer is at `app/dist/Dianis-Setup-<version>.exe`. Run it on both PCs. Windows SmartScreen will
+Download `Dianis-Setup-<version>.exe` from the
+[latest release](https://github.com/Renis032/DianisCommunication/releases/latest) (or build it yourself into
+`app/dist/`, see [Development](#development)). Run it on both PCs. Windows SmartScreen will
 warn because the installer is not code-signed: click **More info → Run anyway**.
 
 On first start, Settings opens:
